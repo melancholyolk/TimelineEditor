@@ -3,17 +3,11 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 using System.Windows.Threading;
 using Timeline.Controls;
 using Timeline.Utilities;
@@ -25,13 +19,14 @@ namespace Timeline
     /// </summary>
     public partial class TimelineEditor : UserControl
     {
+        public static double InitLaneWidth = 8000;
         public double TimelineLaneWidth
         {
             get => (double)GetValue(TimelineLaneWidthProperty);
             set => SetValue(TimelineLaneWidthProperty, value);
         }
         public static readonly DependencyProperty TimelineLaneWidthProperty =
-            DependencyProperty.Register(nameof(TimelineLaneWidth), typeof(double), typeof(TimelineEditor), new FrameworkPropertyMetadata(800.0, TimelineLaneWidthPropertyChanged));
+            DependencyProperty.Register(nameof(TimelineLaneWidth), typeof(double), typeof(TimelineEditor), new FrameworkPropertyMetadata(InitLaneWidth, TimelineLaneWidthPropertyChanged));
 
         public bool IsPlaying
         {
@@ -160,7 +155,13 @@ namespace Timeline
         }
         public static readonly DependencyProperty LaneClickedCommandProperty =
             DependencyProperty.Register(nameof(LaneClickedCommand), typeof(ICommand), typeof(TimelineEditor), new FrameworkPropertyMetadata(null));
-
+        public ICommand ScaleChangedCommand
+        {
+            get => (ICommand)GetValue(ScaleChangedCommandProperty);
+            set => SetValue(ScaleChangedCommandProperty, value);
+        }
+        public static readonly DependencyProperty ScaleChangedCommandProperty =
+            DependencyProperty.Register(nameof(ScaleChangedCommand), typeof(ICommand), typeof(TimelineEditor), new FrameworkPropertyMetadata(null));
         public Point ContextMenuOpeningPosition
         {
             get => (Point)GetValue(ContextMenuOpeningPositionProperty);
@@ -183,9 +184,12 @@ namespace Timeline
             set => SetValue(LaneInputBindingsProperty, value);
         }
         public static readonly DependencyProperty LaneInputBindingsProperty =
-            DependencyProperty.Register(nameof(LaneInputBindings), typeof(InputBindingCollection), typeof(TimelineEditor), new FrameworkPropertyMetadata(new InputBindingCollection(), LaneInputBindingsPropertyChanged));
+            DependencyProperty.Register(nameof(LaneInputBindings), typeof(InputBindingCollection), typeof(TimelineEditor), new FrameworkPropertyMetadata(new InputBindingCollection(), FrameworkPropertyMetadataOptions.BindsTwoWayByDefault));
 
-
+        public double SubHeaderDistance
+        {
+            get => TimelineRuler.LittleUnitDis;
+        }
         List<TimelineKey> SelectedTimelineKeyList { get; } = new List<TimelineKey>();
 
         bool _IsKeyDragMoving = false;                          // KeyをDragで移動しているかどうかのフラグ
@@ -193,7 +197,9 @@ namespace Timeline
         bool _IsKeySelectWithMouseLeftButtonPushing = false;    // Key選択でMouseLeftButtonが押し続けられているかのフラグ
         bool _IsDraggingToDisplayMarker = false;                // DraggingによるMarker表示かどうか
         bool _IsClickedOnLaneOrEmptyArea = false;                   // LaneもしくはEmptyAreaをシングルクリックしたかどうか
-
+        bool _SilenceCurrentTimeCallBack = false;               //跳过设置CurrentBack回调，确保TimeMarker正确更新
+        
+        ScrollBar? _HorizontalScrollBar;
         TimelineKey? _DraggingKey = null;
         DispatcherTimer? _PlayingTimer = null;
 
@@ -259,7 +265,20 @@ namespace Timeline
                 TimelineLaneScrollViewer.ScrollChanged -= TimelineLaneScrollViewer_ScrollChanged;
             };
         }
-
+        public double GetRulerPosition(double position)
+        {
+            //找到最近的subheader
+            return TimelineRuler.FindClosestSubHeaderPosition(position);
+        }
+        public double GetRulerPosition(uint frameCount)
+        {
+            //找到最近的subheader
+            return TimelineRuler.FindClosestSubHeaderPosition(frameCount);
+        }
+        public uint GetPositionFrame(double position)
+        {
+            return TimelineRuler.GetPositionFrame(position);
+        }
         protected override void OnContextMenuOpening(ContextMenuEventArgs e)
         {
             ContextMenuOpeningPosition = new Point(e.CursorLeft, e.CursorTop);
@@ -328,7 +347,7 @@ namespace Timeline
             {
                 if (KeyMovingCommand != null && KeyMovingCommand.CanExecute(MousePositionOnTimelineLane))
                 {
-                    KeyMovingCommand.Execute(MousePositionOnTimelineLane);
+                    KeyMovingCommand.Execute((MousePositionOnTimelineLane));
                 }
 
                 UpdatePositionOnTimelineLane(e);
@@ -406,7 +425,9 @@ namespace Timeline
         static void CurrentTimePropertyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             var editor = (TimelineEditor)d;
-            editor.TimelineMarker.CurrentPosition = (double)e.NewValue * editor.TimelineRuler.UnitDistance;
+            if(editor._SilenceCurrentTimeCallBack)
+                return;
+            editor.TimelineMarker.UpdatePosition((double)e.NewValue * editor.TimelineRuler.UnitDistance * editor.TimelineRuler.Scale);
         }
 
         static void ItemsSourcePropertyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -564,7 +585,7 @@ namespace Timeline
                     throw new InvalidProgramException();
                 }
                 _PlayingTimer = new DispatcherTimer(DispatcherPriority.Normal);
-                _PlayingTimer.Interval = TimeSpan.FromMilliseconds(16.0);
+                _PlayingTimer.Interval = TimeSpan.FromMilliseconds(20.0);
                 _PlayingTimer.Tick += PlayingTimer_Tick;
                 _PlayingTimer.IsEnabled = true;
 
@@ -586,7 +607,7 @@ namespace Timeline
 
         void PlayingTimer_Tick(object? sender, EventArgs e)
         {
-            TimelineMarker.CurrentPosition += 1.0;
+            CurrentTime += _PlayingTimer?.Interval.TotalSeconds ?? 0.0;
         }
 
         void LaneWidthTextBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
@@ -651,7 +672,9 @@ namespace Timeline
 
         void MarkerPositionChanged(object? sender, double position)
         {
-            CurrentTime = position / TimelineRuler.UnitDistance;
+            _SilenceCurrentTimeCallBack = true;
+            CurrentTime = position / TimelineRuler.UnitDistance / TimelineRuler.Scale;
+            _SilenceCurrentTimeCallBack = false;
         }
 
         void ParseLaneWidthText()
@@ -899,6 +922,33 @@ namespace Timeline
                 throw new InvalidCastException();
             }
             _TrackListboxScrollViewer.ScrollToVerticalOffset(e.VerticalOffset);
+            TimelineMarker.InvalidateVisual();
+        }
+        void Thumb_OnDragDeltaRight(object sender, DragDeltaEventArgs e)
+        {
+            AppleScaleChange(-e.HorizontalChange);
+            e.Handled = true;
+        }
+        void Thumb_OnDragDeltaLeft(object sender, DragDeltaEventArgs e)
+        {
+            AppleScaleChange(e.HorizontalChange);
+            e.Handled = true;
+        }
+        void AppleScaleChange(double deltaX)
+        {
+            _HorizontalScrollBar ??= TimelineLaneScrollViewer.Template.FindName("PART_HorizontalScrollBar", TimelineLaneScrollViewer) as ScrollBar;
+            double newScale = (TimelineLaneWidth + deltaX) / InitLaneWidth;
+            if(newScale <= 10)
+            {
+                TimelineLaneWidth = InitLaneWidth * newScale;
+                LaneWidthTextBox.Text = TimelineLaneWidth.ToString();
+                TimelineRuler.Scale = newScale;
+                TimelineMarker.UpdatePositionFromValue(TimelineMarker.SnappedPosition * TimelineRuler.LittleUnitDis);
+                if (ScaleChangedCommand.CanExecute(newScale))
+                {
+                    ScaleChangedCommand.Execute(newScale);
+                }
+            }
         }
     }
 }

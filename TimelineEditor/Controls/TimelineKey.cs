@@ -31,9 +31,20 @@ namespace Timeline.Controls
         public static readonly DependencyProperty IsSelectedProperty =
             DependencyProperty.Register(nameof(IsSelected), typeof(bool), typeof(TimelineKey),
                 new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault, IsSelectedPropertyChanged));
-
+        public bool IsHover
+        {
+            get => (bool)GetValue(IsHoverProperty);
+            set => SetValue(IsHoverProperty, value);
+        }
+        public static readonly DependencyProperty IsHoverProperty =
+            DependencyProperty.Register(nameof(IsHover), typeof(bool), typeof(TimelineKey),
+                new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault, IsHoverPropertyChanged));
         internal EventHandler<MouseButtonEventArgs>? PreMouseLeftButtonDown { get; set; }
         internal EventHandler<MouseButtonEventArgs>? PreMouseLeftButtonUp { get; set; }
+        
+        internal EventHandler<MouseEventArgs>? PreMouseEnter { get; set; }
+        
+        internal EventHandler<MouseEventArgs>? PreMouseLeave { get; set; }
         internal EventHandler<TimelineKey>? SelectionChangedEvent { get; set; }
 
         TranslateTransform Translate { get; }
@@ -80,7 +91,22 @@ namespace Timeline.Controls
                 e.Handled = true;
             }
         }
-
+        protected override void OnMouseEnter(MouseEventArgs e)
+        {
+            PreMouseEnter?.Invoke(this,e);
+            if (!e.Handled)
+            {
+                IsHover = true;
+            }
+        }
+        protected override void OnMouseLeave(MouseEventArgs e)
+        {
+            PreMouseLeave?.Invoke(this,e);
+            if (!e.Handled)
+            {
+                IsHover = false;
+            }
+        }
         static void PlacementPositionPropertyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             var key = (TimelineKey)d;
@@ -91,6 +117,10 @@ namespace Timeline.Controls
         {
             var key = (TimelineKey)d;
             key.SelectionChangedEvent?.Invoke(key, key);
+        }
+        static void IsHoverPropertyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            var key = (TimelineKey)d;
         }
     }
 }

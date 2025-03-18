@@ -4,15 +4,19 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using Test.Utilities;
+using Test.Views;
 
 namespace Test.ViewModels
 {
     public class TimelineKeyViewModel : ViewModel
     {
+        //缩放为1时的位置，帧数
+        public uint ActualPosition { get; set; }
+
+        //缩放为1时的长度，帧数
+        public uint ActualLength { get; set; }
         public double PlacementPosition
         {
             get => _PlacementPosition;
@@ -27,9 +31,18 @@ namespace Test.ViewModels
         }
         bool _IsSelected = true;
 
-        public TimelineKeyViewModel(double position)
+        public double KeyLength
         {
-            PlacementPosition = position;
+            get => _KeyLength;
+            set => RaisePropertyChangedIfSet(ref _KeyLength, value);
+        }
+        double _KeyLength = 360;
+        public TimelineKeyViewModel(uint actualPosition, uint actualLength, double placementPosition, double keyLength)
+        {
+            ActualPosition = actualPosition;
+            ActualLength = actualLength;
+            PlacementPosition = placementPosition;
+            KeyLength = keyLength;
         }
     }
 
@@ -57,7 +70,7 @@ namespace Test.ViewModels
 
         public ViewModelCommand AddKeyWithDoubleClickCommand => _AddKeyWithDoubleClickCommand.Get(AddKeyWithDoubleClick, () => Owner.IsPlaying == false);
         ViewModelCommandHandler _AddKeyWithDoubleClickCommand = new ViewModelCommandHandler();
-        
+
 
         MainWindowViewModel Owner { get; }
 
@@ -68,7 +81,7 @@ namespace Test.ViewModels
 
             CompositeDisposable.Add(() =>
             {
-                foreach(var key in _Keys)
+                foreach (var key in _Keys)
                 {
                     key.Dispose();
                 }
@@ -80,22 +93,24 @@ namespace Test.ViewModels
             AddKeyCommand.RaiseCanExecuteChanged();
             AddKeyWithDoubleClickCommand.RaiseCanExecuteChanged();
         }
-
-        public void AddKey()
+        public void AddKey() => AddKey(1);
+        public void AddKey(uint length = 1)
         {
-            var key = new TimelineKeyViewModel(Owner.ContextMenuOpeningPosition.X);
+            var frameCount = Owner.Viewer.TimelineEditor.GetPositionFrame(Owner.ContextMenuOpeningPosition.X);
+            var key = new TimelineKeyViewModel(frameCount, length, Owner.Viewer.TimelineEditor.GetRulerPosition(frameCount), length * Owner.Viewer.TimelineEditor.SubHeaderDistance);
             AddKey(key);
         }
 
         public void AddKeyWithDoubleClick()
         {
-            var key = new TimelineKeyViewModel(Owner.MousePositionOnTimelineLane.X);
+            var frameCount = Owner.Viewer.TimelineEditor.GetPositionFrame(Owner.MousePositionOnTimelineLane.X);
+            var key = new TimelineKeyViewModel(frameCount, 1, Owner.Viewer.TimelineEditor.GetRulerPosition(frameCount), 1 * Owner.Viewer.TimelineEditor.SubHeaderDistance);
             AddKey(key);
         }
 
         public void AddKey(TimelineKeyViewModel vm)
         {
-            foreach(var key in _Keys)
+            foreach (var key in _Keys)
             {
                 key.IsSelected = false;
             }
@@ -106,7 +121,7 @@ namespace Test.ViewModels
         {
             var removeKeys = _Keys.Where(arg => arg.IsSelected).ToArray();
 
-            foreach(var removeKey in removeKeys)
+            foreach (var removeKey in removeKeys)
             {
                 removeKey.Dispose();
                 _Keys.Remove(removeKey);
@@ -116,6 +131,7 @@ namespace Test.ViewModels
 
     public class MainWindowViewModel : ViewModel
     {
+        public MainWindow Viewer { get; private set; }
         public IEnumerable<TrackItemViewModel> Tracks => _Tracks;
         ObservableCollection<TrackItemViewModel> _Tracks = new ObservableCollection<TrackItemViewModel>();
 
@@ -136,7 +152,6 @@ namespace Test.ViewModels
 
         public ListenerCommand<Point> EndKeyMovingCommand => _EndKeyMovingCommand.Get(EndKeyMoving);
         ViewModelCommandHandler<Point> _EndKeyMovingCommand = new ViewModelCommandHandler<Point>();
-
         public ViewModelCommand LaneClickedCommand => _LaneClickedCommand.Get(LaneClicked);
         ViewModelCommandHandler _LaneClickedCommand = new ViewModelCommandHandler();
 
@@ -152,6 +167,8 @@ namespace Test.ViewModels
         public ViewModelCommand ResetTimeCommand => _ResetTimeCommand.Get(ResetTime);
         ViewModelCommandHandler _ResetTimeCommand = new ViewModelCommandHandler();
 
+        public ListenerCommand<double> ScaleChangedCommand => _ScaleChangedCommand.Get(ScaleChanged);
+        ViewModelCommandHandler<double> _ScaleChangedCommand = new ViewModelCommandHandler<double>();
         public bool IsPlaying
         {
             get => _IsPlaying;
@@ -164,7 +181,7 @@ namespace Test.ViewModels
             get => _IsDisplayMarkerAlways;
             set => RaisePropertyChangedIfSet(ref _IsDisplayMarkerAlways, value);
         }
-        bool _IsDisplayMarkerAlways;        
+        bool _IsDisplayMarkerAlways;
 
         public double CurrentTime
         {
@@ -191,14 +208,15 @@ namespace Test.ViewModels
 
         TimelineKeyViewModel[]? _SelectedKeyVMs = null;
         double[]? _SelectedKeyOffsetPlacements = null;
-
-        public MainWindowViewModel()
+        double scale = 1;
+        public MainWindowViewModel(MainWindow mainWindow)
         {
+            Viewer = mainWindow;
             // ViewModelCommand.RaiseCanExecuteChangedの実行に必要
             DispatcherHelper.UIDispatcher = Application.Current.Dispatcher;
 
             var test1Lane = new TrackItemViewModel("test1", this);
-            test1Lane.AddKey();
+            test1Lane.AddKey(10);
             test1Lane.Keys.ElementAt(0).IsSelected = true;
 
             _Tracks.Add(test1Lane);
@@ -224,9 +242,10 @@ namespace Test.ViewModels
         {
             var addKeyTracks = _Tracks.Where(arg => arg.IsSelected);
 
-            foreach(var addKeyTrack in addKeyTracks)
+            foreach (var addKeyTrack in addKeyTracks)
             {
-                var key = new TimelineKeyViewModel(ContextMenuOpeningPosition.X);
+                var frameCount = Viewer.TimelineEditor.GetPositionFrame(ContextMenuOpeningPosition.X);
+                var key = new TimelineKeyViewModel(frameCount, 1, Viewer.TimelineEditor.GetRulerPosition(frameCount), 1 * Viewer.TimelineEditor.SubHeaderDistance);
                 addKeyTrack.AddKey(key);
             }
         }
@@ -240,17 +259,18 @@ namespace Test.ViewModels
 
         void KeyMoving(Point pos)
         {
-            if(_SelectedKeyVMs == null || _SelectedKeyOffsetPlacements == null)
+            if (_SelectedKeyVMs == null || _SelectedKeyOffsetPlacements == null)
             {
                 throw new InvalidProgramException();
             }
 
             var delta = pos.X - _CapturedBaseKeyPosition.X;
-            for(int i=0; i<_SelectedKeyVMs.Length; i++)
+            for (int i = 0; i < _SelectedKeyVMs.Length; i++)
             {
                 var key = _SelectedKeyVMs[i];
                 var offset = _SelectedKeyOffsetPlacements[i];
-                key.PlacementPosition = offset + delta;
+                key.PlacementPosition = Viewer.TimelineEditor.GetRulerPosition(offset + delta);
+                key.ActualPosition = Viewer.TimelineEditor.GetPositionFrame(key.PlacementPosition);
             }
         }
 
@@ -262,7 +282,7 @@ namespace Test.ViewModels
 
         void LaneClicked()
         {
-            foreach(var key in _Tracks.SelectMany(arg => arg.Keys))
+            foreach (var key in _Tracks.SelectMany(arg => arg.Keys))
             {
                 key.IsSelected = false;
             }
@@ -271,7 +291,7 @@ namespace Test.ViewModels
         void DeleteOnTrack()
         {
             var removeTracks = _Tracks.Where(arg => arg.IsSelected).ToArray();
-            foreach(var removeTrack in removeTracks)
+            foreach (var removeTrack in removeTracks)
             {
                 removeTrack.Dispose();
                 _Tracks.Remove(removeTrack);
@@ -299,6 +319,16 @@ namespace Test.ViewModels
         void ResetTime()
         {
             CurrentTime = 0;
+        }
+        void ScaleChanged(double newScale)
+        {
+            scale = newScale;
+            var keys = _Tracks.SelectMany(x => x.Keys);
+            foreach (var key in keys)
+            {
+                key.PlacementPosition = Viewer.TimelineEditor.GetRulerPosition(key.ActualPosition);
+                key.KeyLength = key.ActualLength * Viewer.TimelineEditor.SubHeaderDistance;
+            }
         }
     }
 }

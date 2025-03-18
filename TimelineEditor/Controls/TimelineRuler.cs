@@ -14,8 +14,11 @@ namespace Timeline.Controls
     {
         public double Scale
         {
-            get => (double)GetValue(ScaleProperty);
-            set => SetValue(ScaleProperty, value);
+            get
+            {
+                return (double)GetValue(ScaleProperty);
+            }
+            set => SetValue(ScaleProperty, Math.Clamp(value, float.Epsilon,10));
         }
         public static readonly DependencyProperty ScaleProperty =
             DependencyProperty.Register(nameof(Scale), typeof(double), typeof(TimelineRuler), new FrameworkPropertyMetadata(1.0, FrameworkPropertyMetadataOptions.AffectsRender));
@@ -88,7 +91,11 @@ namespace Timeline.Controls
         static double SubLineOffset = 1;
         static double SubLineLength = 5 + SubLineOffset;
         static double TextHorizontalOffset = 2;
-
+        
+        public double LittleUnitDis
+        {
+            get => UnitDistance / SubUnitCount * Scale;
+        }
         static void ColorPropertyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             ((TimelineRuler)d).UpdatePen(true);
@@ -106,7 +113,18 @@ namespace Timeline.Controls
                 ((Canvas)Parent).SizeChanged += TimelineRuler_SizeChanged;
             };
         }
-
+        public double FindClosestSubHeaderPosition(double pointX)
+        {
+            return GetPositionFrame(pointX) * LittleUnitDis;
+        }
+        public double FindClosestSubHeaderPosition(uint frameCount)
+        {
+            return frameCount * LittleUnitDis;
+        }
+        public uint GetPositionFrame(double pointX)
+        {
+            return (uint)(pointX / LittleUnitDis);
+        }
         protected override void OnRender(DrawingContext dc)
         {
             base.OnRender(dc);
@@ -138,27 +156,24 @@ namespace Timeline.Controls
 
         void OnRenderHorizontal(DrawingContext dc)
         {
-            double s = Math.Max(Scale, 1);
-
             // 親Canvasの縦横を取得
             var parentCanvas = (Canvas)Parent;
             var parentActualWidth = parentCanvas.ActualWidth;
             var parentActualHeight = parentCanvas.ActualHeight;
-
-            int init = Math.Max(0, (int)(-Offset.X / UnitDistance) - 1);
-            int count = (int)((-Offset.X + parentActualWidth) / UnitDistance) + 1;
+            
+            int init = Math.Max(0, (int)(-Offset.X / UnitDistance / Scale) - 1);
+            int count = (int)(parentActualWidth / UnitDistance / Scale) + 2;
 
             double subLineDistance = UnitDistance / SubUnitCount;
 
-            for (int i = init; i < count; ++i)
+            for (int i = init; i <= init + count; ++i)
             {
-                double num = i * UnitDistance;
-                double x = (num + Offset.X) * s;
+                double x = Offset.X + i * UnitDistance * Scale;
                 dc.DrawLine(_LinePen, new Point(x, LineOffset), new Point(x, LineOffset + parentActualHeight));
 
-                for (int j = 1; j < 10; ++j)
+                for (int j = 1; j < SubUnitCount; ++j)
                 {
-                    double sub_x = x + j * subLineDistance * s;
+                    double sub_x = x + j * subLineDistance * Scale;
                     dc.DrawLine(_SubLinePen, new Point(sub_x, SubLineOffset), new Point(sub_x, SubLineLength));
                 }
 
@@ -184,7 +199,7 @@ namespace Timeline.Controls
                 double y = (num + Offset.Y) * s;
                 dc.DrawLine(_LinePen, new Point(LineOffset, y), new Point(LineLength, y));
 
-                for (int j = 1; j < 10; ++j)
+                for (int j = 1; j < SubUnitCount; ++j)
                 {
                     double sub_y = y + j * subLineDistance * s;
                     dc.DrawLine(_SubLinePen, new Point(SubLineOffset, sub_y), new Point(SubLineLength, sub_y));

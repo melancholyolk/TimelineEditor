@@ -1,92 +1,221 @@
-﻿<Window x:Class="Test.Views.MainWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:vm="clr-namespace:Test.ViewModels"
-        xmlns:tl="clr-namespace:Timeline;assembly=Timeline"
-        xmlns:tl_ctrls="clr-namespace:Timeline.Controls;assembly=Timeline"
-        xmlns:local="clr-namespace:Test" 
-        mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-
-    <Window.DataContext>
-        <vm:MainWindowViewModel/>
-    </Window.DataContext>
-
+﻿<Window
+    x:Class="Test.Views.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:vm="clr-namespace:Test.ViewModels"
+    xmlns:tl="clr-namespace:Timeline;assembly=Timeline"
+    xmlns:tl_ctrls="clr-namespace:Timeline.Controls;assembly=Timeline"
+    xmlns:local="clr-namespace:Test"
+    mc:Ignorable="d"
+    Title="MainWindow"
+    Height="450"
+    Width="800">
+    <Window.Resources>
+        <ControlTemplate
+            x:Key="KeyTemplate"
+            TargetType="{x:Type tl_ctrls:TimelineKey}">
+            <Border
+                BorderThickness="1">
+                <Border.Style>
+                    <Style
+                        TargetType="{x:Type Border}">
+                        <Style.Triggers>
+                            <DataTrigger
+                                Binding="{Binding IsSelected}"
+                                Value="True">
+                                <Setter
+                                    Property="BorderBrush"
+                                    Value="WhiteSmoke" />
+                            </DataTrigger>
+                            <DataTrigger
+                                Binding="{Binding IsSelected}"
+                                Value="False">
+                                <Setter
+                                    Property="BorderBrush"
+                                    Value="DimGray" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <Grid>
+                    <!-- Normal态 -->
+                    <Grid
+                        Opacity="1"
+                        Width="{Binding KeyLength}"
+                        Background="White">
+                    </Grid>
+                    <!-- Hover态 -->
+                    <Grid
+                        x:Name="HoverVisual"
+                        Opacity="0"
+                        Width="{Binding KeyLength}"
+                        Background="Aqua">
+                    </Grid>
+                    <!-- Select态 -->
+                    <Grid
+                        x:Name="SelectVisual"
+                        Opacity="0"
+                        Width="{Binding KeyLength}"
+                        Background="Red">
+                    </Grid>
+                </Grid>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger
+                    Property="IsHover"
+                    Value="True">
+                    <Setter
+                        TargetName="HoverVisual"
+                        Property="Opacity"
+                        Value="1" />
+                </Trigger>
+                <Trigger
+                    Property="IsSelected"
+                    Value="True">
+                    <Setter
+                        TargetName="SelectVisual"
+                        Property="Opacity"
+                        Value="1" />
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+    </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="0.7*"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="0.3*"/>
+            <RowDefinition
+                Height="0.7*" />
+            <RowDefinition
+                Height="Auto" />
+            <RowDefinition
+                Height="0.3*" />
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0">
+        <Grid
+            Grid.Row="0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="0.3*"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
+                <ColumnDefinition
+                    Width="0.3*" />
+                <ColumnDefinition
+                    Width="Auto" />
+                <ColumnDefinition
+                    Width="*" />
             </Grid.ColumnDefinitions>
-            
-            <StackPanel Grid.Column="0">
-                <Button Content="Add Track" Command="{Binding AddTrackCommand}"/>
-                <Button Content="Play or Stop" Command="{Binding SwitchPlayingStateCommand}"/>
-                <Button Content="Reset time" Command="{Binding ResetTimeCommand}"/>
-                <CheckBox Content="Display marker always" IsChecked="{Binding IsDisplayMarkerAlways}"/>
+
+            <StackPanel
+                Grid.Column="0">
+                <Button
+                    Content="Add Track"
+                    Command="{Binding AddTrackCommand}" />
+                <Button
+                    Content="Play or Stop"
+                    Command="{Binding SwitchPlayingStateCommand}" />
+                <Button
+                    Content="Reset time"
+                    Command="{Binding ResetTimeCommand}" />
+                <CheckBox
+                    Content="Display marker always"
+                    IsChecked="{Binding IsDisplayMarkerAlways}" />
             </StackPanel>
 
-            <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" Width="2"/>
+            <GridSplitter
+                Grid.Column="1"
+                HorizontalAlignment="Stretch"
+                Width="2" />
 
-            <Grid Grid.Column="2" Background="Black">
-                <TextBlock Text="{Binding CurrentTime, StringFormat=CurrentTime : {0:F2}}" Foreground="WhiteSmoke" VerticalAlignment="Center" Margin="32,0,0,0"/>
+            <Grid
+                Grid.Column="2"
+                Background="Black">
+                <TextBlock
+                    Text="{Binding CurrentTime, StringFormat=CurrentTime : {0:F2}}"
+                    Foreground="WhiteSmoke"
+                    VerticalAlignment="Center"
+                    Margin="32,0,0,0" />
             </Grid>
         </Grid>
 
-        <GridSplitter Grid.Row="1" Height="2" HorizontalAlignment="Stretch"/>
+        <GridSplitter
+            Grid.Row="1"
+            Height="2"
+            HorizontalAlignment="Stretch" />
 
-        <tl:TimelineEditor Grid.Row="2" 
-                           IsPlaying="{Binding IsPlaying}"
-                           ItemsSource="{Binding Tracks}"
-                           CurrentTime="{Binding CurrentTime}"
-                           IsDisplayMarkerAlways="{Binding IsDisplayMarkerAlways}"
-                           TimelineLaneBackground="#FF303030"
-                           BeginKeyMovingCommand="{Binding BeginKeyMovingCommand}"
-                           KeyMovingCommand="{Binding KeyMovingCommand}"
-                           EndKeyMovingCommand="{Binding EndKeyMovingCommand}"
-                           LaneClickedCommand="{Binding LaneClickedCommand}"
-                           ContextMenuOpeningPosition="{Binding ContextMenuOpeningPosition}"
-                           MousePositionOnTimelineLane="{Binding MousePositionOnTimelineLane}">
+        <tl:TimelineEditor
+            Grid.Row="2"
+            x:Name="TimelineEditor"
+            IsPlaying="{Binding IsPlaying}"
+            ItemsSource="{Binding Tracks}"
+            CurrentTime="{Binding CurrentTime,Mode=TwoWay}"
+            IsDisplayMarkerAlways="{Binding IsDisplayMarkerAlways}"
+            TimelineLaneBackground="#FF303030"
+            BeginKeyMovingCommand="{Binding BeginKeyMovingCommand}"
+            KeyMovingCommand="{Binding KeyMovingCommand}"
+            EndKeyMovingCommand="{Binding EndKeyMovingCommand}"
+            LaneClickedCommand="{Binding LaneClickedCommand}"
+            ScaleChangedCommand="{Binding  ScaleChangedCommand}"
+            ContextMenuOpeningPosition="{Binding ContextMenuOpeningPosition}"
+            MousePositionOnTimelineLane="{Binding MousePositionOnTimelineLane}">
 
             <tl:TimelineEditor.LaneInputBindings>
-                <KeyBinding Gesture="Delete" Command="{Binding DeleteOnLaneCommand}"/>
+                <KeyBinding
+                    Gesture="Delete"
+                    Command="{Binding DeleteOnLaneCommand}" />
             </tl:TimelineEditor.LaneInputBindings>
 
             <tl:TimelineEditor.TrackInputBindings>
-                <KeyBinding Gesture="Delete" Command="{Binding DeleteOnTrackCommand}"/>
+                <KeyBinding
+                    Gesture="Delete"
+                    Command="{Binding DeleteOnTrackCommand}" />
             </tl:TimelineEditor.TrackInputBindings>
 
             <tl:TimelineEditor.TrackHeaderTemplate>
                 <DataTemplate>
-                    <Border BorderThickness="0,0,0,1" Background="#FF444444" BorderBrush="Black">
-                        <TextBlock Text="Tracks" Foreground="WhiteSmoke" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                    <Border
+                        BorderThickness="0,0,0,1"
+                        Background="#FF444444"
+                        BorderBrush="Black">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition
+                                    Width="Auto" />
+                                <ColumnDefinition
+                                    Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock
+                                Text="Tracks"
+                                Foreground="WhiteSmoke"
+                                VerticalAlignment="Center"
+                                Margin="8,0,0,0" />
+
+                        </Grid>
                     </Border>
                 </DataTemplate>
             </tl:TimelineEditor.TrackHeaderTemplate>
 
             <tl:TimelineEditor.TrackListBoxStyle>
-                <Style TargetType="{x:Type ListBox}">
-                    <Setter Property="Foreground" Value="WhiteSmoke"/>
-                    <Setter Property="Background" Value="#FF444444"/>
+                <Style
+                    TargetType="{x:Type ListBox}">
+                    <Setter
+                        Property="Foreground"
+                        Value="WhiteSmoke" />
+                    <Setter
+                        Property="Background"
+                        Value="#FF444444" />
                 </Style>
             </tl:TimelineEditor.TrackListBoxStyle>
 
             <tl:TimelineEditor.TrackItemContainerStyle>
-                <Style TargetType="{x:Type ListBoxItem}">
-                    <Setter Property="IsSelected" Value="{Binding IsSelected}"/>
-                    <Setter Property="ContentTemplate">
+                <Style
+                    TargetType="{x:Type ListBoxItem}">
+                    <Setter
+                        Property="IsSelected"
+                        Value="{Binding IsSelected}" />
+                    <Setter
+                        Property="ContentTemplate">
                         <Setter.Value>
                             <DataTemplate>
-                                <TextBlock Text="{Binding Name}"/>
+                                <TextBlock
+                                    Text="{Binding Name}" />
                             </DataTemplate>
                         </Setter.Value>
                     </Setter>
@@ -94,70 +223,63 @@
             </tl:TimelineEditor.TrackItemContainerStyle>
 
             <tl:TimelineEditor.TimelineLaneContainerStyle>
-                <Style TargetType="{x:Type tl_ctrls:TimelineLaneCanvas}">
-                    <Setter Property="KeysSource" Value="{Binding Keys}"/>
-                    <Setter Property="LaneDoubleClickedCommand" Value="{Binding AddKeyWithDoubleClickCommand}"/>
-                    <Setter Property="Background" Value="#FF555555"/>
-                    <Setter Property="ContextMenu">
+                <Style
+                    TargetType="{x:Type tl_ctrls:TimelineLaneCanvas}">
+                    <Setter
+                        Property="KeysSource"
+                        Value="{Binding Keys}" />
+                    <Setter
+                        Property="LaneDoubleClickedCommand"
+                        Value="{Binding AddKeyWithDoubleClickCommand}" />
+                    <Setter
+                        Property="Background"
+                        Value="#FF555555" />
+                    <Setter
+                        Property="ContextMenu">
                         <Setter.Value>
                             <ContextMenu>
-                                <MenuItem Header="Add Key" Command="{Binding AddKeyCommand}"/>
+                                <MenuItem
+                                    Header="Add Key"
+                                    Command="{Binding AddKeyCommand}" />
                             </ContextMenu>
                         </Setter.Value>
                     </Setter>
                     <Style.Triggers>
-                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                            <Setter Property="Background" Value="#CC888888"/>
+                        <DataTrigger
+                            Binding="{Binding IsSelected}"
+                            Value="True">
+                            <Setter
+                                Property="Background"
+                                Value="#CC888888" />
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>
             </tl:TimelineEditor.TimelineLaneContainerStyle>
 
             <tl:TimelineEditor.TimelineKeyContainerStyle>
-                <Style TargetType="{x:Type tl_ctrls:TimelineKey}">
-                    <Setter Property="PlacementPosition" Value="{Binding PlacementPosition}"/>
-                    <Setter Property="IsSelected" Value="{Binding IsSelected}"/>
-                    <Setter Property="Width" Value="12"/>
-                    <Setter Property="Template">
-                        <Setter.Value>
-                            <ControlTemplate TargetType="{x:Type tl_ctrls:TimelineKey}">
-                                <Border BorderThickness="1">
-                                    <Border.Style>
-                                        <Style TargetType="{x:Type Border}">
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                    <Setter Property="BorderBrush" Value="WhiteSmoke"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding IsSelected}" Value="False">
-                                                    <Setter Property="BorderBrush" Value="DimGray"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Border.Style>
-                                    <Rectangle Width="8" Fill="Black">
-                                        <Rectangle.Style>
-                                            <Style TargetType="{x:Type Rectangle}">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                        <Setter Property="Fill" Value="Aqua"/>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding IsSelected}" Value="False">
-                                                        <Setter Property="Fill" Value="Black"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Rectangle.Style>
-                                    </Rectangle>
-                                </Border>
-                            </ControlTemplate>
-                        </Setter.Value>
+                <Style
+                    TargetType="{x:Type tl_ctrls:TimelineKey}">
+                    <Setter
+                        Property="PlacementPosition"
+                        Value="{Binding PlacementPosition}" />
+                    <Setter
+                        Property="IsSelected"
+                        Value="{Binding IsSelected}" />
+                    <Setter
+                        Property="Width"
+                        Value="{Binding KeyLength}" />
+                    <Setter
+                        Property="Template"
+                        Value="{StaticResource KeyTemplate}">
                     </Setter>
                 </Style>
             </tl:TimelineEditor.TimelineKeyContainerStyle>
 
             <tl:TimelineEditor.ContextMenu>
                 <ContextMenu>
-                    <MenuItem Header="Remove Tracks" Command="{Binding RemoveTracksCommand}"/>
+                    <MenuItem
+                        Header="Remove Tracks"
+                        Command="{Binding RemoveTracksCommand}" />
                 </ContextMenu>
             </tl:TimelineEditor.ContextMenu>
         </tl:TimelineEditor>
